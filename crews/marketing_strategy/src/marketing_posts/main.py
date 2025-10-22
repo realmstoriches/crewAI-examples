@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/binbin/env python
 import sys
+from dotenv import load_dotenv
+load_dotenv()
 from marketing_posts.crew import MarketingPostsCrew
-
 
 def run():
     # Replace with your inputs, it will automatically interpolate any tasks and agents information
@@ -35,3 +36,7 @@ Project Overview: Creating a comprehensive marketing campaign to boost awareness
 
     except Exception as e:
         raise Exception(f"An error occurred while training the crew: {e}")
+    
+    
+if __name__ == "__main__":
+    run() if len(sys.argv) <= 1 else train()

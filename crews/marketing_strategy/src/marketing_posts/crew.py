@@ -1,162 +1,115 @@
+# src/marketing_posts/crew.py
 import os
-from typing import List
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from pydantic import BaseModel, Field
+from typing import List
 
 # --- Tool Imports ---
-# We've replaced SerperDevTool with TavilySearchResults
-from crewai_tools import ScrapeWebsiteTool, TavilySearchResults
+# We keep these for research
+from crewai_tools import ScrapeWebsiteTool, TavilySearchTool 
+# We add our new custom tools
+from marketing_posts.tools.shopify_tools import LoadStoreProductsTool, UpdateProductSEOTool
 
 # --- LLM Imports ---
-from langchain_community.llms import Ollama
+from langchain_ollama import Ollama as OllamaLLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
-# --------------------------------------------------------------------
-# 1. DEFINE YOUR TOOLS AND LLMS
-# --------------------------------------------------------------------
-
-# (Tools will read TAVILY_API_KEY from .env)
-search_tool = TavilySearchResults()
+# --- Initialize LLMs (Same as before, but with OllamaLLM) ---
+search_tool = TavilySearchTool()
 scrape_tool = ScrapeWebsiteTool()
+load_products_tool = LoadStoreProductsTool()
+update_seo_tool = UpdateProductSEOTool()
 
-# (LLMs will read their keys from .env)
+ollama_llm = OllamaLLM(...) # Your Ollama setup
+gemini_fallback = ...      # Your Gemini setup
+openai_fallback = ...      # Your OpenAI setup
 
-# 1. Main LLM: Ollama
-# It reads the URL and model from your .env file
-# (Defaults to llama3 and localhost:11434 if not set)
-ollama_llm = Ollama(
-    model=os.getenv("OLLAMA_MODEL", "llama3"),
-    base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-)
-
-# 2. Fallback LLMs
-# These will automatically use GEMINI_API_KEY and OPENAI_API_KEY
-gemini_fallback = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest")
-openai_fallback = ChatOpenAI(model="gpt-4o-mini")
-
-# --------------------------------------------------------------------
-# 2. DEFINE YOUR DATA MODELS (Pydantic)
-# (This section is unchanged)
-# --------------------------------------------------------------------
-
-class MarketStrategy(BaseModel):
-	"""Market strategy model"""
-	name: str = Field(..., description="Name of the market strategy")
-	tatics: List[str] = Field(..., description="List of tactics to be used in the market strategy")
-	channels: List[str] = Field(..., description="List of channels to be used in the market strategy")
-	KPIs: List[str] = Field(..., description="List of KPIs to be used in the market strategy")
-
-class CampaignIdea(BaseModel):
-	"""Campaign idea model"""
-	name: str = Field(..., description="Name of the campaign idea")
-	description: str = Field(..., description="Description of the campaign idea")
-	audience: str = Field(..., description="Audience of the campaign idea")
-	channel: str = Field(..., description="Channel of the campaign idea")
-
+# --- Pydantic Models (Can be the same or modified) ---
 class Copy(BaseModel):
-	"""Copy model"""
-	title: str = Field(..., description="Title of the copy")
-	body: str = Field(..., description="Body of the copy")
+    title: str = Field(..., description="Title of the copy")
+    body: str = Field(..., description="Body of the copy")
+
+# A new model for SEO
+class ProductSEO(BaseModel):
+    product_id: int = Field(..., description="The ID of the product to update")
+    seo_title: str = Field(..., description="The new, optimized SEO title (max 60 chars)")
+    seo_description: str = Field(..., description="The new, optimized SEO description (max 160 chars)")
 
 # --------------------------------------------------------------------
-# 3. DEFINE YOUR CREW
-# (This is where all the changes are applied)
+# 3. DEFINE YOUR NEW CREW
 # --------------------------------------------------------------------
-
 @CrewBase
 class MarketingPostsCrew():
-	"""MarketingPosts crew"""
-	agents_config = 'config/agents.yaml'
-	tasks_config = 'config/tasks.yaml'
+    """Shopify Marketing & SEO Crew"""
+    agents_config = 'config/agents.yaml'
+    tasks_config = 'config/tasks.yaml'
 
-	@agent
-	def lead_market_analyst(self) -> Agent:
-		return Agent(
-			config=self.agents_config['lead_market_analyst'],
-			# --- MODIFIED ---
-			tools=[search_tool, scrape_tool],  # Replaced Serper with Tavily
-			llm=ollama_llm,                      # Set main LLM
-			fallback_llm=[gemini_fallback, openai_fallback], # Set fallbacks
-			# --- END MODIFIED ---
-			verbose=True,
-			memory=False,
-		)
+    # --- NEW AGENTS ---
 
-	@agent
-	def chief_marketing_strategist(self) -> Agent:
-		return Agent(
-			config=self.agents_config['chief_marketing_strategist'],
-			# --- MODIFIED ---
-			tools=[search_tool, scrape_tool],  # Replaced Serper with Tavily
-			llm=ollama_llm,                      # Set main LLM
-			fallback_llm=[gemini_fallback, openai_fallback], # Set fallbacks
-			# --- END MODIFIED ---
-			verbose=True,
-			memory=False,
-		)
+    @agent
+    def shopify_analyst(self) -> Agent:
+        return Agent(
+            config=self.agents_config['shopify_analyst'], # You'll need to update agents.yaml
+            tools=[load_products_tool, search_tool], # Can load products and search
+            verbose=True
+        )
 
-	@agent
-	def creative_content_creator(self) -> Agent:
-		return Agent(
-			config=self.agents_config['creative_content_creator'],
-			# --- MODIFIED ---
-			# This agent doesn't need tools, but it needs the LLMs
-			llm=ollama_llm,                      # Set main LLM
-			fallback_llm=[gemini_fallback, openai_fallback], # Set fallbacks
-			# --- END MODIFIED ---
-			verbose=True,
-			memory=False,
-		)
+    @agent
+    def seo_specialist(self) -> Agent:
+        return Agent(
+            config=self.agents_config['seo_specialist'], # You'll need to update agents.yaml
+            tools=[search_tool, scrape_tool, update_seo_tool], # Can research and update SEO
+            verbose=True
+        )
 
-	# --- TASKS (Unchanged) ---
- 
-	@task
-	def research_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['research_task'],
-			agent=self.lead_market_analyst()
-		)
+    @agent
+    def marketing_copywriter(self) -> Agent:
+        return Agent(
+            config=self.agents_config['creative_content_creator'], # Can reuse the old one
+            verbose=True
+            # No tools needed, just writes based on context
+        )
 
-	@task
-	def project_understanding_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['project_understanding_task'],
-			agent=self.chief_marketing_strategist()
-		)
+    # --- NEW TASKS ---
 
-	@task
-	def marketing_strategy_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['marketing_strategy_task'],
-			agent=self.chief_marketing_strategist(),
-			output_json=MarketStrategy
-		)
+    @task
+    def load_products_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['load_products_task'], # New task in tasks.yaml
+            agent=self.shopify_analyst()
+            # This task's output will be the list of all products
+        )
 
-	@task
-	def campaign_idea_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['campaign_idea_task'],
-			agent=self.creative_content_creator(),
-   			output_json=CampaignIdea
-		)
+    @task
+    def seo_optimization_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['seo_optimization_task'], # New task in tasks.yaml
+            agent=self.seo_specialist(),
+            context=[self.load_products_task()], # Depends on products being loaded
+            output_json=ProductSEO 
+            # We want structured output for *each* product
+            # Note: You may need to adjust this to output a List[ProductSEO]
+        )
+    
+    @task
+    def marketing_campaign_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['marketing_campaign_task'], # New task in tasks.yaml
+            agent=self.marketing_copywriter(),
+            context=[self.seo_optimization_task()], # Runs after SEO is done
+            output_json=Copy
+        )
 
-	@task
-	def copy_creation_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['copy_creation_task'],
-			agent=self.creative_content_creator(),
-   			context=[self.marketing_strategy_task(), self.campaign_idea_task()],
-			output_json=Copy
-		)
-
-	@crew
-	def crew(self) -> Crew:
-		"""Creates the MarketingPosts crew"""
-		return Crew(
-			agents=self.agents, # Automatically created by the @agent decorator
-			tasks=self.tasks, # Automatically created by the @task decorator
-			process=Process.sequential,
-			verbose=True,
-		)
+    @crew
+    def crew(self) -> Crew:
+        """Creates the Shopify SEO crew"""
+        return Crew(
+            agents=[self.shopify_analyst(), self.seo_specialist(), self.marketing_copywriter()],
+            tasks=[self.load_products_task(), self.seo_optimization_task(), self.marketing_campaign_task()],
+            process=Process.sequential,
+            verbose=True,
+            llm=ollama_llm,
+            fallback_llm=[gemini_fallback, openai_fallback]
+        )
