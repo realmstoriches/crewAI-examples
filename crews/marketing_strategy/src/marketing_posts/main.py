@@ -1,19 +1,17 @@
-#!/usr/binbin/env python
+#!/usr/bin/env python
 import sys
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv() # <-- This MUST be at the top
+
 from marketing_posts.crew import MarketingPostsCrew
 
 def run():
-    # Replace with your inputs, it will automatically interpolate any tasks and agents information
+    # --- NEW INPUTS ---
+    # These will be injected into your task descriptions
     inputs = {
-        'customer_domain': 'crewai.com',
-        'project_description': """
-CrewAI, a leading provider of multi-agent systems, aims to revolutionize marketing automation for its enterprise clients. This project involves developing an innovative marketing strategy to showcase CrewAI's advanced AI-driven solutions, emphasizing ease of use, scalability, and integration capabilities. The campaign will target tech-savvy decision-makers in medium to large enterprises, highlighting success stories and the transformative potential of CrewAI's platform.
-
-Customer Domain: AI and Automation Solutions
-Project Overview: Creating a comprehensive marketing campaign to boost awareness and adoption of CrewAI's services among enterprise clients.
-"""
+        'target_audience': 'Tech-savvy professionals and small business owners who value high-quality, unique products.',
+        'brand_voice': 'Professional, slightly playful, innovative, and customer-focused.',
+        'product_type': 'Unique 3D printed gadgets and home decor' # Change this to your store's general category
     }
     MarketingPostsCrew().crew().kickoff(inputs=inputs)
 
@@ -23,13 +21,9 @@ def train():
     Train the crew for a given number of iterations.
     """
     inputs = {
-        'customer_domain': 'crewai.com',
-        'project_description': """
-CrewAI, a leading provider of multi-agent systems, aims to revolutionize marketing automation for its enterprise clients. This project involves developing an innovative marketing strategy to showcase CrewAI's advanced AI-driven solutions, emphasizing ease of use, scalability, and integration capabilities. The campaign will target tech-savvy decision-makers in medium to large enterprises, highlighting success stories and the transformative potential of CrewAI's platform.
-
-Customer Domain: AI and Automation Solutions
-Project Overview: Creating a comprehensive marketing campaign to boost awareness and adoption of CrewAI's services among enterprise clients.
-"""
+        'target_audience': 'Tech-savvy professionals and small business owners who value high-quality, unique products.',
+        'brand_voice': 'Professional, slightly playful, innovative, and customer-focused.',
+        'product_type': 'Unique 3D printed gadgets and home decor' # Change this to your store's general category
     }
     try:
         MarketingPostsCrew().crew().train(n_iterations=int(sys.argv[1]), inputs=inputs)
